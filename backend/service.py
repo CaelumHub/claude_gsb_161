@@ -268,15 +268,20 @@ class Service:
         if want_profile:
             prof = profiler_mod.Profiler()
             vm.profiler = prof
+            # 必须在运行前挂载 VM：采样线程运行期间要持续读取 VM 的当前位置
+            prof.attach_vm(vm)
             if options.get("sample", True):
                 prof.start_sampling(float(options.get("sample_interval_ms", 1.0)))
         if options.get("inputs"):
             vm.input_queue = list(options["inputs"])
         vm.start()
-        vm.run()
+        try:
+            vm.run()
+        finally:
+            # 即使运行期抛出错误，也要确保采样线程被回收
+            if prof:
+                prof.stop_sampling()
         if prof:
-            prof.attach_vm(vm)
-            prof.stop_sampling()
             report = prof.report()
         else:
             report = None

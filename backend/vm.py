@@ -141,9 +141,13 @@ class VM:
             self.profiler.begin_run()
 
     def current_position(self):
-        if self.frames:
-            fr = self.frames[-1]
-            return (fr.func_name, max(1, fr.current_line - 1))
+        # 采样线程会并发调用本方法：函数返回时 frames 可能恰好在弹出，
+        # 因此一次取出最后一帧并判空，避免 IndexError。
+        frames = self.frames
+        fr = frames[-1] if frames else None
+        if fr is not None:
+            line = fr.current_line or self._cur_line
+            return (fr.func_name, line)
         return ("<main>", 0)
 
     def peek_instruction(self):

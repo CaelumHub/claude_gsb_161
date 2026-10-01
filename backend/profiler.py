@@ -90,7 +90,9 @@ class Profiler:
         if self._sampling_thread is not None and self._sampling_thread.is_alive():
             return
         self.sample_interval_ms = interval_ms
-        self._sample_interval = max(interval_ms, 0.05)
+        # wait() 的参数单位是秒；前端传入的是毫秒，需要换算。
+        # 同时设下限 0.05ms，避免过小的间隔造成忙等。
+        self._sample_interval = max(interval_ms, 0.05) / 1000.0
         self._sampling_stop.clear()
         self._sampling_thread = threading.Thread(
             target=self._sample_loop, name="gsb-sampler", daemon=True)
@@ -106,7 +108,12 @@ class Profiler:
         while not self._sampling_stop.wait(self._sample_interval):
             if self._vm is None:
                 continue
-            name, line = self._vm.current_position()
+            # VM 在另一线程上执行，读取帧栈时函数可能正在返回（帧被弹出），
+            # 取最后一帧需防止 IndexError，否则采样线程会静默退出、样本停止累积。
+            try:
+                name, line = self._vm.current_position()
+            except IndexError:
+                continue
             self.samples.append((name, line))
 
     # ------------------------------------------------------------------
