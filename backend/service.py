@@ -268,6 +268,8 @@ class Service:
         if want_profile:
             prof = profiler_mod.Profiler()
             vm.profiler = prof
+            # 必须在启动采样线程前挂载 VM，否则采样时 VM 尚未运行、所有样本被丢弃
+            prof.attach_vm(vm)
             if options.get("sample", True):
                 prof.start_sampling(float(options.get("sample_interval_ms", 1.0)))
         if options.get("inputs"):

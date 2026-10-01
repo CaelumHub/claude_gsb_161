@@ -90,7 +90,8 @@ class Profiler:
         if self._sampling_thread is not None and self._sampling_thread.is_alive():
             return
         self.sample_interval_ms = interval_ms
-        self._sample_interval = max(interval_ms, 0.05)
+        # 入参单位是毫秒，Event.wait 单位是秒
+        self._sample_interval = max(interval_ms, 0.05) / 1000.0
         self._sampling_stop.clear()
         self._sampling_thread = threading.Thread(
             target=self._sample_loop, name="gsb-sampler", daemon=True)
@@ -105,6 +106,9 @@ class Profiler:
     def _sample_loop(self):
         while not self._sampling_stop.wait(self._sample_interval):
             if self._vm is None:
+                continue
+            # VM 尚未开始或已结束（帧栈为空）时没有有效位置，不计入样本
+            if getattr(self._vm, "finished", False) or not self._vm.frames:
                 continue
             name, line = self._vm.current_position()
             self.samples.append((name, line))

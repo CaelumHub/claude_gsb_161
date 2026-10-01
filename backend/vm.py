@@ -143,7 +143,8 @@ class VM:
     def current_position(self):
         if self.frames:
             fr = self.frames[-1]
-            return (fr.func_name, max(1, fr.current_line - 1))
+            # current_line 即当前执行指令的源行号（1 起）；尚未执行任何指令时记为第 1 行
+            return (fr.func_name, max(1, fr.current_line))
         return ("<main>", 0)
 
     def peek_instruction(self):

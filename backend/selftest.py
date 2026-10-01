@@ -192,6 +192,16 @@ def _test_profiler():
     ok2 = any("work" in n for n in fn_names)
     _check("剖析器：插桩统计函数调用与指令数", ok and ok2, str(fn_names) if not (ok and ok2) else "")
 
+    # 采样：长耗时程序必须累积到落在 work() 内的样本（回归：VM 在运行后才挂载导致样本全丢）
+    src2 = ("func work() { var s = 0; for (var i = 0; i < 50000; i = i + 1) { s = s + i; } return s; }\n"
+            "print(work());")
+    out2 = _run(src2, profile=True, sample=True, sample_interval_ms=0.1)
+    samp = (out2.get("profile") or {}).get("sampling") or {}
+    sfuncs = {f["name"]: f["samples"] for f in samp.get("functions", [])}
+    ok_sample = samp.get("sample_count", 0) > 0 and sfuncs.get("work", 0) > 0
+    _check("剖析器：统计采样在函数执行期间累积样本", ok_sample,
+           f"sample_count={samp.get('sample_count')}, funcs={sfuncs}" if not ok_sample else "")
+
 
 def _test_memory_model():
     src = "var a = [1, 2, 3];\nvar b = [a, 99];\nprint(b[0]);"
